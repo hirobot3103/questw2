@@ -102,10 +102,11 @@ function Show_serviceList ()
 # 引数:$1 サービス名文字列
 #---------------------------------------------------------------
 function getpassword_do () {
-    local fpath=$DATA_FILE_PATH
-    local inputData=$1
-    local hitflg=0
+    local fpath=$DATA_FILE_PATH    # データファイル(復号後)
+    local inputData=$1             # サービス名
+    local hitflg=0                 # サービス名がファイル内にあるかどうかを示すフラグ
 
+    # 復号
     decrypts
 
     # cat | while文とすると、While文内で変数を代入してもwhileの外では反映しなかった⇒リダイレクトへ
@@ -125,6 +126,7 @@ function getpassword_do () {
 
     done < $fpath
 
+    # 暗号
     encrypts
 
     # ファイル内で一件もヒットしなかった場合はその旨を表示
@@ -145,11 +147,13 @@ function addpassword_do () {
     local user_name=$2
     local password=$3
 
+    # 復号
     decrypts
 
     # ファイルに追記
     echo "${service_name}:${user_name}:${password}" >> $fpath
 
+    # 暗号
     encrypts
 
     # 書き込み完了を通知
@@ -158,15 +162,13 @@ function addpassword_do () {
 
 # gpgコマンドで暗号化したファイルを複合（共通鍵暗号）
 function decrypts () {
-    #gpg $DATA_FILE_PATH_GPG
-    gpg --batch --passphrase-fd 0 $DATA_FILE_PATH_GPG < goblin.dat | >/dev/null
+    gpg --batch --passphrase-fd 0 $DATA_FILE_PATH_GPG < goblin.dat
     rm $DATA_FILE_PATH_GPG
 }
 
 # gpgコマンドで暗号化したファイルを暗号化（共通鍵暗号）
 function encrypts () {
-    #gpg --batch --passphrase-fd 0 --symmetric hello.txt < password.txt
-    gpg --batch --passphrase-fd 0 --symmetric $DATA_FILE_PATH < goblin.dat | >/dev/null
+    gpg --batch --passphrase-fd 0 --symmetric $DATA_FILE_PATH < goblin.dat
     rm $DATA_FILE_PATH
 }
 
@@ -182,7 +184,6 @@ function addpassword () {
 
     # 空欄の場合はもう一度入力するよう促す。
     if [ "$service_name" = "" ] || [ "$user_name" = "" ] || [ "$passwords" = "" ]; then
-        
         exist_blank $service_name $user_name $passwords
         return 0    
     else

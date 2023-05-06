@@ -15,7 +15,8 @@ DATA_FILE_PATH_GPG='./servicelist.csv.gpg' # データファイル格納先(複�
 #---------------------------------------------------------------
 # 入力を促すプロンプトを表示
 #---------------------------------------------------------------
-function show_prommpt () {
+function show_prommpt ()
+{
     echo -n '次の選択肢から入力してください(Add Password/Get Password/Exit)：'
 }
 
@@ -32,7 +33,8 @@ function select_wrongmenu ()
 # 入力を促すプロンプトを表示(addpassword/getpassword用)
 # 戻値：入力された文字列(echoで返す)
 #---------------------------------------------------------------
-function show_prommpt_gp () {
+function show_prommpt_gp ()
+{
     read -p 'サービス名を入力してください。:' inputword
     echo $inputword;
 }
@@ -41,7 +43,8 @@ function show_prommpt_gp () {
 # 入力を促すプロンプトを表示(addpassword用)
 # 戻値：入力された文字列(echoで返す)
 #---------------------------------------------------------------
-function show_prommpt_un () {
+function show_prommpt_un ()
+{
     read -p 'ユーザー名を入力してください。:' inputword
     echo $inputword;
 }
@@ -50,7 +53,8 @@ function show_prommpt_un () {
 # 入力を促すプロンプトを表示(addpassword用)
 # 戻値：入力された文字列(echoで返す)
 #---------------------------------------------------------------
-function show_prommpt_pw () {
+function show_prommpt_pw ()
+{
     read -p 'パスワードを入力してください。:' inputword
     echo $inputword;
 }
@@ -101,7 +105,8 @@ function Show_serviceList ()
 # ファイル内データの照合／明細表示(getpassword用)
 # 引数:$1 サービス名文字列
 #---------------------------------------------------------------
-function getpassword_do () {
+function getpassword_do ()
+{
     local fpath=$DATA_FILE_PATH    # データファイル(復号後)
     local inputData=$1             # サービス名
     local hitflg=0                 # サービス名がファイル内にあるかどうかを示すフラグ
@@ -109,7 +114,7 @@ function getpassword_do () {
     # 復号
     decrypts
 
-    # cat | while文とすると、While文内で変数を代入してもwhileの外では反映しなかった⇒リダイレクトへ
+    # cat | while文とすると、While文内で変数に数値を代入してもwhileの外では反映しなかった⇒リダイレクトへ
     while read line
     do
 
@@ -120,7 +125,7 @@ function getpassword_do () {
             user_name=$(echo ${line} | cut -d ':' -f 2)
             passwords=$(echo ${line} | cut -d ':' -f 3)
 
-            Show_serviceList $service_name $user_name $passwords  
+            Show_serviceList "${service_name}" "${user_name}" "${passwords}"  
             hitflg=1
         fi
 
@@ -131,7 +136,7 @@ function getpassword_do () {
 
     # ファイル内で一件もヒットしなかった場合はその旨を表示
     if test $hitflg -eq 0; then
-        nohit_servicename $inputData
+        nohit_servicename "${inputData}"
     fi
 }
 
@@ -141,41 +146,82 @@ function getpassword_do () {
 # 引数:$2 ユーザー名として入力された文字列
 # 引数:$3 パスワードとして入力された文字列
 #---------------------------------------------------------------
-function addpassword_do () {
+function addpassword_do ()
+{
     local fpath=$DATA_FILE_PATH
     local service_name=$1
     local user_name=$2
     local password=$3
+    local writeflg=1    # ファイルへ追記するかを示すフラグ 0:追記しない 
 
     # 復号
     decrypts
 
-    # ファイルに追記
-    echo "${service_name}:${user_name}:${password}" >> $fpath
+    # 既に登録済みのサービスかをチェックし、上書きするかを問い合わせる。
+    local rtn_val=$(grep "${service_name}:${user_name}:" $DATA_FILE_PATH)
+    
+    if [ "${rtn_val}" != "" ]; then
+        echo -n '既に登録済みのサービスです。上書きしますか？：(y/n)'
+        read char
+        case $char in
+            'y' )
+                sed -n -i -r "/${service_name}:${user_name}:/d" $DATA_FILE_PATH   # 該当する行を一旦、削除⇒ファイルに追記しなおす。
+                echo '入力された内容であらためて登録しなおします。'
+                ;;          
+            'n' )
+                echo '登録せずに終了します。'
+                writeflg=0
+                ;;
+            * )
+                echo 'y,n以外の文字が入力されました。もう一度メニューから選択してください。'
+                writeflg=0
+                ;;
+        esac
+    fi
+
+    # 上書き/新規登録の場合、ファイルへ追記
+    if test $writeflg -eq 1; then
+
+        # ファイルに追記
+        echo "${service_name}:${user_name}:${password}" >> $fpath
+
+        # 書き込み完了を通知
+        success_regit
+    fi
 
     # 暗号
     encrypts
-
-    # 書き込み完了を通知
-    success_regit
 }
 
+#---------------------------------------------------------------
 # gpgコマンドで暗号化したファイルを複合（共通鍵暗号）
-function decrypts () {
+#---------------------------------------------------------------
+function decrypts ()
+{
+    echo '--------------- file 復号中 　-------------------'
     gpg --batch --passphrase-fd 0 $DATA_FILE_PATH_GPG < goblin.dat
     rm $DATA_FILE_PATH_GPG
+    echo '--------------- file 復号完了 -------------------'
+ 
 }
 
+#---------------------------------------------------------------
 # gpgコマンドで暗号化したファイルを暗号化（共通鍵暗号）
-function encrypts () {
+#---------------------------------------------------------------
+function encrypts ()
+{
+    echo '--------------- file 暗号化中 -------------------'
     gpg --batch --passphrase-fd 0 --symmetric $DATA_FILE_PATH < goblin.dat
     rm $DATA_FILE_PATH
+    echo '--------------- file 暗号化完了 -----------------'
+
 }
 
 #---------------------------------------------------------------
 # Add Password選択時の処理（メイン）
 #---------------------------------------------------------------
-function addpassword () {
+function addpassword ()
+{
 
     # 入力内容の取得/入力された文字列をチェック(３項目一括入力)
     service_name=$(show_prommpt_gp)
@@ -184,26 +230,26 @@ function addpassword () {
 
     # 空欄の場合はもう一度入力するよう促す。
     if [ "$service_name" = "" ] || [ "$user_name" = "" ] || [ "$passwords" = "" ]; then
-        exist_blank $service_name $user_name $passwords
+        exist_blank "${service_name}" "${user_name}" "{$passwords}"
         return 0    
     else
 
-        # ファイルに書き込む
-        addpassword_do $service_name $user_name $passwords
-
+        # ファイルに書き込む(引数の中にスペースが入る場合に備えて"変数展開""とした。)
+        addpassword_do "${service_name}" "${user_name}" "${passwords}"
     fi
 }
 
 #---------------------------------------------------------------
 # Get Password選択時の処理（メイン）
 #---------------------------------------------------------------
-function getpassword(){
+function getpassword()
+{
 
     # 入力されたサービス名を取得
    local inputwords=$(show_prommpt_gp)
 
    # データファイルと照合し、該当すれば明細を表示
-   getpassword_do $inputwords
+   getpassword_do "${inputwords}"
 
 }
 
